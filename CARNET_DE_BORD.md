@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| Équipe | _à compléter_ |
+| Équipe | _Jus de Bissap_ |
 | Membres | Emerick Marchese · Rafael De Haro · Mathis _(nom à compléter)_ |
 | Dépôt | https://github.com/PR0X1T34/bricoloop |
 | Vidéo | _lien à ajouter_ |
@@ -17,9 +17,9 @@
 | | PO | SM |
 |---|---|---|
 | Lancement | Rafael | – |
-| Sprint 1 | Rafael | _à compléter_ |
-| Sprint 2 | Emerick | _à compléter_ |
-| Sprint 3 | Mathis | _à compléter_ |
+| Sprint 1 | Rafael | _Aucun_ |
+| Sprint 2 | Emerick | _Aucun_ |
+| Sprint 3 | Mathis | _Aucun_ |
 
 ## Lancement
 
