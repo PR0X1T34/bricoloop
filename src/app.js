@@ -160,8 +160,13 @@ export function createApp(data = seedData()) {
   });
 
   // US-01 : consulter le catalogue des outils
+  // US-11 : ?q=mot-clé cherche dans le nom et la description (sans tenir compte des majuscules)
   app.get('/api/tools', (req, res) => {
-    const tools = [...data.tools]
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+    const tools = data.tools
+      .filter(
+        (t) => !q || t.name.toLowerCase().includes(q) || (t.description ?? '').toLowerCase().includes(q),
+      )
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
       .map(({ id, name, category, status }) => ({ id, name, category, status }));
     res.status(200).json(tools);
