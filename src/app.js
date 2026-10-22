@@ -110,5 +110,27 @@ export function createApp(data = seedData()) {
     });
   });
 
+  // US-07 : déclarer le retour d'un outil
+  app.post('/api/loans/:id/return', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const loan = data.loans.find((l) => l.id === req.params.id);
+    if (!loan) {
+      return res.status(404).json({ error: 'Prêt introuvable' });
+    }
+    const tool = data.tools.find((t) => t.id === loan.toolId);
+    if (!tool || tool.ownerId !== user.id) {
+      return res.status(403).json({ error: "Seul le propriétaire de l'outil peut déclarer le retour" });
+    }
+    if (loan.status !== 'accepted') {
+      return res.status(409).json({ error: "Seul un prêt accepté peut être déclaré rendu" });
+    }
+    loan.status = 'returned';
+    tool.status = 'available';
+    res.status(200).json({ ...loan, toolStatus: tool.status });
+  });
+
   return app;
 }
