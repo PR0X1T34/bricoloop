@@ -3,6 +3,11 @@ import { CATEGORIES, seedData } from './seed.js';
 
 const STATUS_ORDER = { available: 0, lent: 1, unavailable: 2 };
 
+
+// Deux périodes [début, fin] se chevauchent si chacune commence avant la fin de l'autre (bornes incluses)
+function overlaps(a, b) {
+  return a.startDate <= b.endDate && b.startDate <= a.endDate;
+}
 const NAME_MIN = 2;
 const NAME_MAX = 60;
 const DESCRIPTION_MAX = 300;
@@ -83,8 +88,15 @@ export function createApp(data = seedData()) {
     if (tool.ownerId === user.id) {
       return res.status(400).json({ error: 'Impossible de demander son propre outil' });
     }
-    if (tool.status !== 'available') {
+    if (tool.status === 'unavailable') {
       return res.status(400).json({ error: "L'outil n'est pas disponible" });
+    }
+    // US-06 : pas de chevauchement avec un prêt déjà accepté
+    const conflict = data.loans.some(
+      (l) => l.toolId === tool.id && l.status === 'accepted' && overlaps(l, { startDate, endDate }),
+    );
+    if (conflict) {
+      return res.status(409).json({ error: 'Ces dates chevauchent un prêt déjà accepté' });
     }
     const loan = {
       id: `l${data.loans.length + 1}`,
@@ -120,6 +132,15 @@ export function createApp(data = seedData()) {
     }
     if (loan.status !== 'pending') {
       return res.status(409).json({ error: "Cette demande n'est plus en attente" });
+    }
+    // US-06 : on ne peut pas accepter deux prêts qui se chevauchent
+    const conflictOnAccept =
+      newStatus === 'accepted' &&
+      data.loans.some(
+        (l) => l.id !== loan.id && l.toolId === loan.toolId && l.status === 'accepted' && overlaps(l, loan),
+      );
+    if (conflictOnAccept) {
+      return res.status(409).json({ error: 'Ces dates chevauchent un prêt déjà accepté' });
     }
     loan.status = newStatus;
     if (newStatus === 'accepted') {
