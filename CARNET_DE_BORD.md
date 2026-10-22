@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | Équipe | _à compléter_ |
-| Membres | Emerick Marchese · Rafael De Haro · _à compléter (Genesith)_ · _à compléter (PR0X1T34)_ |
+| Membres | Emerick Marchese · Rafael De Haro · Mathis _(nom à compléter)_ |
 | Dépôt | https://github.com/PR0X1T34/bricoloop |
 | Vidéo | _lien à ajouter_ |
 | Date | jeudi 22 octobre 2026 |
@@ -16,10 +16,10 @@
 
 | | PO | SM |
 |---|---|---|
-| Lancement | _à compléter_ | – |
-| Sprint 1 | _à compléter_ | _à compléter_ |
-| Sprint 2 | _à compléter_ | _à compléter_ |
-| Sprint 3 | _à compléter_ | _à compléter_ |
+| Lancement | Rafael | – |
+| Sprint 1 | Rafael | _à compléter_ |
+| Sprint 2 | Emerick | _à compléter_ |
+| Sprint 3 | Mathis | _à compléter_ |
 
 ## Lancement
 
@@ -39,7 +39,7 @@
 
 **Sprint 0 (état à 11:15 → 11:20)** : dépôt créé, `main` protégée (pas de push direct, 1 review obligatoire), README, outillage `npm run lint` / `npm test` / `npm run check`, seed de 4 voisins et 8 outils dans 5 catégories, CI GitHub Actions qui lance `npm run check` sur chaque PR. Tout est livré dans le commit `chore: sprint 0 - setup projet` (11:20). T-01 à T-04 sont donc Done, bonus CI compris.
 
-**Décisions du PO du lancement** : _à compléter_
+**Décisions du PO du lancement (Rafael)** : _à compléter_
 
 ## Déroulé réel (d'après l'historique Git)
 
@@ -54,7 +54,7 @@
 | 12:18 → 12:26 | US-07 retour d'un outil, mergée | #8 |
 | 12:13 → 12:27 | US-06 chevauchements, conflit résolu puis mergée | #6 |
 | 12:27 → 12:32 | US-08 mes emprunts, corrigée puis mergée | #9 |
-| ≈ 12:32 | **Daily Scrum** après US-08 : point sur l'avancement et sur ce qu'il reste à faire | – |
+| ≈ 12:32 | **Fin du Sprint 1.** Le Sprint 2 commence par un Daily Scrum : point sur l'avancement et sur ce qu'il reste à faire | – |
 | 12:34 → 12:46 | US-09 interface web, conflit résolu puis mergée | #11 |
 
 À 12:46, `main` contient US-01 à US-09 : `npm run check` donne 0 warning de lint et 76 tests verts.
@@ -63,14 +63,12 @@
 
 | | |
 |---|---|
-| PO / SM | _à compléter_ |
+| PO / SM | Rafael / _à compléter_ |
 | Sprint Goal | _à compléter_ (ex. : « Un voisin peut voir le catalogue, ouvrir une fiche et demander un outil ») |
 | Points engagés / Done | _à compléter_ |
 | Burndown (début / +15 / +30 / fin) | _à compléter_ |
 
-**Stories Done** : US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-08, US-09 (_à répartir entre les sprints si besoin_). Chaque story a sa branche `feature/US-xx-…` partie de `main`, un commit `test:` puis un commit `feat:`, au moins un test par critère d'acceptation (cas d'erreur compris), une PR et la CI au vert avant le merge.
-
-**Daily Scrum** : en plus des dailies prévus, nous avons fait un daily après le merge de US-08 pour faire le point sur l'avancement : stories terminées, PR en attente de relecture, et ce qu'il restait (US-09). C'est là que nous avons décidé de faire afficher « Mes demandes » (US-08) par l'interface web de US-09.
+**Stories Done** : US-01 à US-08. Chaque story a sa branche `feature/US-xx-…` partie de `main`, un commit `test:` puis un commit `feat:`, au moins un test par critère d'acceptation (cas d'erreur compris), une PR et la CI au vert avant le merge.
 
 **Imprévus et réaction de l'équipe**
 
@@ -79,7 +77,6 @@
 - **Conflit entre US-02 (#7) et US-06 (#6)** : les deux ajoutaient des fonctions au même endroit de `app.js`. Résolu en intégrant `main` dans la branche US-06 avant de la merger.
 - **US-08 a repris du code de US-06** : la branche était partie d'un `main` trop ancien, d'où un commit `fix:` pour réaligner le code avant le merge (#9).
 - **Modification de `eslint.config.js` par l'interface GitHub (PR #10)** : commit « Update eslint.config.js » non préfixé, sur une branche hors convention. Le contenu était correct, mais pas la forme.
-- **Conflit sur US-09** : résolu en intégrant `main` dans la branche (`chore: intégrer main dans US-09`) avant le merge de la PR #11.
 
 **Ce que nous en retenons** : plusieurs personnes modifiaient le même fichier `src/app.js` en parallèle. La règle « branche créée depuis `main` à jour » est donc essentielle, et les tests automatiques et la CI nous ont évité de merger du code cassé.
 
@@ -98,20 +95,22 @@
 
 | | |
 |---|---|
-| PO / SM | _à compléter_ |
-| Sprint Goal | _à compléter_ |
+| PO / SM | Emerick / _à compléter_ |
+| Sprint Goal | _à compléter_ (ex. : « Un voisin fait tout le parcours d'emprunt depuis une page web ») |
 | Points engagés / Done | _à compléter_ |
 | Burndown | _à compléter_ |
-| Stories acceptées / refusées | _à compléter_ |
-| Imprévus et réaction | _à compléter_ |
+| Stories acceptées / refusées | US-09 Interface web, acceptée (PR #11) |
+| Imprévus et réaction | Conflit sur US-09 : résolu en intégrant `main` dans la branche (`chore: intégrer main dans US-09`) avant le merge de la PR #11 |
 | Rétro (Start / Stop / Continue) et action | _à compléter_ |
 | Action du sprint 1 appliquée ? | _à compléter_ |
+
+**Daily Scrum** : dès le début du Sprint 2, nous avons fait un daily pour faire le point sur l'avancement : stories terminées au Sprint 1 (US-01 à US-08), PR en attente de relecture, et ce qu'il restait à faire (US-09). C'est là que nous avons décidé que l'interface web de US-09 afficherait aussi « Mes demandes » (US-08).
 
 ## Sprint 3
 
 | | |
 |---|---|
-| PO / SM | _à compléter_ |
+| PO / SM | Mathis / _à compléter_ |
 | Sprint Goal | _à compléter_ |
 | Points engagés / Done | _à compléter_ |
 | Burndown | _à compléter_ |
@@ -136,10 +135,15 @@
 
 Pas encore commencées : US-10 à US-14.
 
+**Valeur PO livrée** : 305 sur 365 (84 %). Toutes les stories Must (190) et les 4 premières Should (115) sont livrées.
+
 ## Bilan
 
 - **Vélocité sur les 3 sprints** : _à compléter_
 - **Ce qui a bien marché** : tout le parcours Must (catalogue → fiche → demande → acceptation → retour) est livré et testé, avec une interface web. Les tests automatiques ont détecté une régression avant le merge (route US-05 écrasée par la branche US-02).
 - **Ce qui a coincé** : trop de modifications en parallèle dans un seul fichier (`src/app.js`), d'où des conflits et du code écrasé. Il aurait fallu découper les routes en plusieurs fichiers (`src/routes/…`). Deux PR ont été faites depuis l'interface GitHub sans respecter la convention.
-- **Retour de chaque PO sur son rôle** (3 à 4 lignes chacun) : _à compléter_
+- **Retour de chaque PO sur son rôle** (3 à 4 lignes chacun) :
+  - Rafael (lancement et sprint 1) : _à compléter_
+  - Emerick (sprint 2) : _à compléter_
+  - Mathis (sprint 3) : _à compléter_
 - **Un apprentissage par membre** : _à compléter_
