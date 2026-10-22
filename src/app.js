@@ -177,6 +177,22 @@ export function createApp(data = seedData()) {
     res.status(201).location(`/api/tools/${tool.id}`).json(tool);
   });
 
+  // US-08 : voir mes demandes et mes emprunts
+  app.get('/api/loans/mine', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const loans = data.loans
+      .filter((l) => l.borrowerId === user.id)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .map((l) => ({
+        ...l,
+        toolName: data.tools.find((t) => t.id === l.toolId)?.name ?? null,
+      }));
+    res.status(200).json(loans);
+  });
+
   // US-03 : voir le détail d'un outil
   app.get('/api/tools/:id', (req, res) => {
     const tool = data.tools.find((t) => t.id === req.params.id);
