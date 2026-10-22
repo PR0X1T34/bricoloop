@@ -98,6 +98,36 @@ export function createApp(data = seedData()) {
     res.status(201).json(loan);
   });
 
+  // US-05 : accepter ou refuser une demande
+  const DECISIONS = { accept: 'accepted', refuse: 'refused' };
+
+  app.post('/api/loans/:id/:decision', (req, res, next) => {
+    const newStatus = DECISIONS[req.params.decision];
+    if (!newStatus) {
+      return next();
+    }
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const loan = data.loans.find((l) => l.id === req.params.id);
+    if (!loan) {
+      return res.status(404).json({ error: 'Demande introuvable' });
+    }
+    const tool = data.tools.find((t) => t.id === loan.toolId);
+    if (!tool || tool.ownerId !== user.id) {
+      return res.status(403).json({ error: "Seul le propriétaire de l'outil peut répondre" });
+    }
+    if (loan.status !== 'pending') {
+      return res.status(409).json({ error: "Cette demande n'est plus en attente" });
+    }
+    loan.status = newStatus;
+    if (newStatus === 'accepted') {
+      tool.status = 'lent';
+    }
+    res.status(200).json({ ...loan, toolStatus: tool.status });
+  });
+
   // US-01 : consulter le catalogue des outils
   app.get('/api/tools', (req, res) => {
     const tools = [...data.tools]
