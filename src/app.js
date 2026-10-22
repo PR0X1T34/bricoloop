@@ -1,5 +1,9 @@
 import express from 'express';
+import { fileURLToPath } from 'node:url';
 import { CATEGORIES, seedData } from './seed.js';
+
+// US-09 : dossier de l'interface web (servie sur /)
+const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 
 const STATUS_ORDER = { available: 0, lent: 1, unavailable: 2 };
 
@@ -62,10 +66,16 @@ function isValidDate(value) {
 export function createApp(data = seedData()) {
   const app = express();
   app.use(express.json());
+  app.use(express.static(PUBLIC_DIR));
   app.locals.data = data;
 
   app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
+  });
+
+  // US-09 : liste des profils pour le sélecteur de l'interface web
+  app.get('/api/users', (req, res) => {
+    res.status(200).json(data.users.map(({ id, firstName, district }) => ({ id, firstName, district })));
   });
 
   // US-04 : demander l'emprunt d'un outil
