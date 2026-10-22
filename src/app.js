@@ -1,7 +1,50 @@
 import express from 'express';
-import { seedData } from './seed.js';
+import { CATEGORIES, seedData } from './seed.js';
 
 const STATUS_ORDER = { available: 0, lent: 1, unavailable: 2 };
+
+const NAME_MIN = 2;
+const NAME_MAX = 60;
+const DESCRIPTION_MAX = 300;
+
+// US-02 : renvoie { field, error } si invalide, sinon { value } (champs nettoyés)
+function validateToolInput(body) {
+  const { name, category, description } =
+    body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+
+  const cleanName = typeof name === 'string' ? name.trim() : '';
+  if (cleanName.length < NAME_MIN || cleanName.length > NAME_MAX) {
+    return {
+      field: 'name',
+      error: `Le nom est obligatoire et doit contenir entre ${NAME_MIN} et ${NAME_MAX} caractères`,
+    };
+  }
+  if (!CATEGORIES.includes(category)) {
+    return {
+      field: 'category',
+      error: `La catégorie doit être l'une des suivantes : ${CATEGORIES.join(', ')}`,
+    };
+  }
+  let cleanDescription = '';
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string') {
+      return { field: 'description', error: 'La description doit être un texte' };
+    }
+    cleanDescription = description.trim();
+    if (cleanDescription.length > DESCRIPTION_MAX) {
+      return {
+        field: 'description',
+        error: `La description ne doit pas dépasser ${DESCRIPTION_MAX} caractères`,
+      };
+    }
+  }
+  return { value: { name: cleanName, category, description: cleanDescription } };
+}
+
+function nextToolId(tools) {
+  const max = tools.reduce((m, t) => Math.max(m, Number(String(t.id).slice(1)) || 0), 0);
+  return `t${max + 1}`;
+}
 
 function isValidDate(value) {
   return (
@@ -91,6 +134,26 @@ export function createApp(data = seedData()) {
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
       .map(({ id, name, category, status }) => ({ id, name, category, status }));
     res.status(200).json(tools);
+  });
+
+  // US-02 : proposer un outil au prêt
+  app.post('/api/tools', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const result = validateToolInput(req.body);
+    if (result.error) {
+      return res.status(400).json({ error: result.error, field: result.field });
+    }
+    const tool = {
+      id: nextToolId(data.tools),
+      ownerId: user.id,
+      ...result.value,
+      status: 'available',
+    };
+    data.tools.push(tool);
+    res.status(201).location(`/api/tools/${tool.id}`).json(tool);
   });
 
   // US-03 : voir le détail d'un outil
