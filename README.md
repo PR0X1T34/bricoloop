@@ -6,16 +6,21 @@
 
 | Membre | Rôle |
 |--------|------|
-| _à compléter_ | |
+| Rafael De Haro | Développeur, PO du lancement et du Sprint 1 |
+| Emerick Marchese | Développeur, PO du Sprint 2 |
+| Mathis _(nom à compléter)_ | Développeur, PO du Sprint 3 |
+| Dogan _(nom à compléter)_ | Développeur, arrivé au Sprint 3 |
 
 ### Rotation PO / SM
 
 |           | PO | SM |
 |-----------|----|----|
-| Lancement |    | –  |
-| Sprint 1  |    |    |
-| Sprint 2  |    |    |
-| Sprint 3  |    |    |
+| Lancement | Rafael | – |
+| Sprint 1  | Rafael | _à compléter_ |
+| Sprint 2  | Emerick | _à compléter_ |
+| Sprint 3  | Mathis | _à compléter_ |
+
+Dogan a rejoint l'équipe au Sprint 3 : il ne restait qu'un sprint, il n'a donc pas pu être PO.
 
 ## Lancer le projet
 
@@ -44,6 +49,9 @@ Toutes les routes répondent en JSON. Celles qui ont « oui » dans la colonne `
 | GET | `/api/users` |  | US-09 | Liste des voisins (sélecteur de profil) |
 | GET | `/api/tools` |  | US-01 | Catalogue, outils disponibles en premier |
 | GET | `/api/tools?q=perceuse` |  | US-11 | Recherche dans le nom et la description, sans tenir compte des majuscules |
+| GET | `/api/tools?category=Perçage` |  | US-10 | Filtre par catégorie (400 si la catégorie est inconnue), combinable avec `q` |
+| GET | `/api/tools/mine` | oui | US-12 | Mes outils, le nombre de demandes en attente et le prêt en cours |
+| GET | `/api/tools/:id/history` | oui | US-14 | Historique des prêts acceptés et rendus, du plus récent au plus ancien (propriétaire seulement) |
 | GET | `/api/tools/:id` |  | US-03 | Fiche d'un outil avec le prénom et le quartier du propriétaire (404 si inconnu) |
 | POST | `/api/tools` | oui | US-02 | Proposer un outil : `name` (2 à 60), `category`, `description` (facultative, 300 max) |
 | POST | `/api/loans` | oui | US-04, US-06 | Demander un emprunt : `toolId`, `startDate`, `endDate` (`AAAA-MM-JJ`) |
@@ -51,6 +59,9 @@ Toutes les routes répondent en JSON. Celles qui ont « oui » dans la colonne `
 | POST | `/api/loans/:id/refuse` | oui | US-05 | Le propriétaire refuse une demande |
 | POST | `/api/loans/:id/return` | oui | US-07 | Le propriétaire déclare le retour (l'outil redevient « disponible ») |
 | GET | `/api/loans/mine` | oui | US-08 | Mes demandes et emprunts, triés par date de début |
+| POST | `/api/loans/:id/rating` | oui | US-13 | Noter l'emprunteur de 1 à 5 (`score`), une fois, sur un prêt rendu |
+| GET | `/api/notifications` | oui | US-15 | Mes notifications (demande reçue, acceptée, refusée, retour, note) et le nombre de non lues |
+| POST | `/api/notifications/read` | oui | US-15 | Marquer toutes mes notifications comme lues |
 
 Catégories autorisées : Perçage, Jardinage, Peinture, Nettoyage, Mesure, Autre.
 
@@ -93,7 +104,12 @@ test/           tests Vitest + Supertest
 | US-07 · Déclarer le retour d'un outil | #8 |
 | US-08 · Voir mes emprunts | #9 |
 | US-09 · Interface web du parcours d'emprunt | #11 |
+| US-10 · Filtrer le catalogue par catégorie | _PR à venir_ |
 | US-11 · Rechercher un outil par mot-clé | #12 |
+| US-12 · Voir mes outils et les demandes reçues | _PR à venir_ |
+| US-13 · Noter l'emprunteur après le retour | _PR à venir_ |
+| US-14 · Consulter l'historique des prêts d'un outil | _PR à venir_ |
+| US-15 · Notifications (ajoutée au backlog par l'équipe) | _PR à venir_ |
 
 État de `main` : `npm run check` → 0 warning de lint, 83 tests verts.
 
