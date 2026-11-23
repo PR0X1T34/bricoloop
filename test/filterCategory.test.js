@@ -50,6 +50,6 @@ describe('GET /api/tools?category= (US-10)', () => {
     const page = await request(app).get('/');
     expect(page.text).toContain('id="category"');
     const script = await request(app).get('/main.js');
-    expect(script.text).toContain('/api/tools?category=');
+    expect(script.text).toContain("params.set('category'");
   });
 });

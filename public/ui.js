@@ -12,7 +12,7 @@ export const STATUS_LABELS = {
 
 const ERROR_TITLES = {
   400: 'Demande invalide',
-  401: "Choisis d'abord ton profil",
+  401: "Connecte-toi d'abord",
   403: 'Action non autorisée',
   404: 'Introuvable',
   409: 'Impossible pour ces dates',
@@ -27,4 +27,15 @@ export function formatError(status, body) {
   const title = ERROR_TITLES[status] ?? `Erreur ${status}`;
   const detail = body && typeof body.error === 'string' ? body.error : 'Erreur inattendue du serveur';
   return `${title} : ${detail}`;
+}
+
+// « 1 outil », « 3 outils »
+export function plural(n, word) {
+  return `${n} ${word}${n > 1 ? 's' : ''}`;
+}
+
+// US-13 : note moyenne d'un emprunteur, ex. « ★ 4,5 (2 notes) »
+export function ratingText(rating) {
+  if (!rating) return 'pas encore noté';
+  return `★ ${String(rating.average).replace('.', ',')} (${plural(rating.count, 'note')})`;
 }

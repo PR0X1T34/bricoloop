@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { describe, it, expect } from 'vitest';
 import { createApp } from '../src/app.js';
-import { formatError, statusLabel } from '../public/ui.js';
+import { formatError, plural, ratingText, statusLabel } from '../public/ui.js';
 
 describe("Interface web du parcours d'emprunt (US-09)", () => {
   describe('depuis une page : profil, catalogue, fiche, demande', () => {
@@ -52,12 +52,41 @@ describe("Interface web du parcours d'emprunt (US-09)", () => {
       );
     });
 
-    it('401 : invite à choisir son profil', () => {
-      expect(formatError(401, { error: 'Utilisateur non identifié' })).toMatch(/^Choisis d'abord ton profil/);
+    it('401 : invite à se connecter (US-18 : les profils sont devenus des comptes)', () => {
+      expect(formatError(401, { error: 'Utilisateur non identifié' })).toMatch(/^Connecte-toi d'abord/);
+    });
+
+    it('accorde les mots et affiche la note moyenne', () => {
+      expect(plural(1, 'outil')).toBe('1 outil');
+      expect(plural(3, 'outil')).toBe('3 outils');
+      expect(ratingText({ average: 4.5, count: 2 })).toBe('★ 4,5 (2 notes)');
+      expect(ratingText(null)).toBe('pas encore noté');
     });
 
     it("reste lisible si l'API ne renvoie pas de message", () => {
       expect(formatError(500, null)).toBe('Erreur 500 : Erreur inattendue du serveur');
     });
+  });
+});
+
+describe('Interface web : comptes, modification, photos (US-16 à US-18)', () => {
+  it('propose la connexion et la création de compte', async () => {
+    const page = await request(createApp()).get('/');
+    expect(page.text).toContain('id="login-form"');
+    expect(page.text).toContain('id="register-form"');
+  });
+
+  it('permet de modifier, supprimer et ajouter des photos depuis Mes outils', async () => {
+    const script = await request(createApp()).get('/main.js');
+    expect(script.text).toContain("method: 'PATCH'");
+    expect(script.text).toContain("method: 'DELETE'");
+    expect(script.text).toContain('/photos');
+    expect(script.text).toContain("api('/api/auth/login'");
+  });
+
+  it('sert la feuille de style', async () => {
+    const res = await request(createApp()).get('/style.css');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/css/);
   });
 });
