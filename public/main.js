@@ -13,6 +13,10 @@ const els = {
   detail: document.getElementById('detail'),
   hint: document.getElementById('detail-hint'),
   mine: document.getElementById('mine'),
+  bell: document.getElementById('bell'),
+  unread: document.getElementById('unread'),
+  notifList: document.getElementById('notif-list'),
+  markRead: document.getElementById('mark-read'),
   message: document.getElementById('message'),
 };
 
@@ -175,10 +179,77 @@ els.category.addEventListener('change', () => {
   loadCatalogue().catch((err) => showMessage(err.message, 'error'));
 });
 
+
+// US-15 : notifications (demande reçue, demande acceptée ou refusée)
+const NOTIF_REFRESH_MS = 5000;
+
+async function respond(loanId, decision) {
+  try {
+    await api(`/api/loans/${encodeURIComponent(loanId)}/${decision}`, { method: 'POST' });
+    showMessage(decision === 'accept' ? 'Demande acceptée.' : 'Demande refusée.', 'success');
+    await loadNotifications();
+    if (state.selectedToolId) await openTool(state.selectedToolId);
+    else await loadCatalogue();
+  } catch (err) {
+    showMessage(err.message, 'error');
+  }
+}
+
+async function loadNotifications() {
+  els.notifList.replaceChildren();
+  if (!state.userId) {
+    els.bell.hidden = true;
+    els.markRead.hidden = true;
+    els.notifList.append(el('li', 'Choisis ton profil pour voir tes notifications.', 'empty'));
+    return;
+  }
+  const { unread, items } = await api('/api/notifications');
+  els.bell.hidden = false;
+  els.unread.textContent = String(unread);
+  els.unread.className = unread > 0 ? 'count' : 'count zero';
+  els.markRead.hidden = unread === 0;
+  if (items.length === 0) {
+    els.notifList.append(el('li', "Aucune notification pour l'instant.", 'empty'));
+    return;
+  }
+  for (const n of items) {
+    const li = el('li', undefined, n.read ? '' : 'unread');
+    li.append(el('span', n.message));
+    li.append(el('span', new Date(n.createdAt).toLocaleString('fr-FR'), 'notif-time'));
+    if (n.type === 'loan_requested' && n.loanStatus === 'pending') {
+      const actions = el('div', undefined, 'notif-actions');
+      const accept = el('button', 'Accepter', 'accept');
+      accept.type = 'button';
+      accept.addEventListener('click', () => respond(n.loanId, 'accept'));
+      const refuse = el('button', 'Refuser');
+      refuse.type = 'button';
+      refuse.addEventListener('click', () => respond(n.loanId, 'refuse'));
+      actions.append(accept, refuse);
+      li.append(actions);
+    } else if (n.type === 'loan_requested' && n.loanStatus) {
+      li.append(el('span', statusLabel(n.loanStatus), `badge ${n.loanStatus}`));
+    }
+    els.notifList.append(li);
+  }
+}
+
+els.markRead.addEventListener('click', async () => {
+  try {
+    await api('/api/notifications/read', { method: 'POST' });
+    await loadNotifications();
+  } catch (err) {
+    showMessage(err.message, 'error');
+  }
+});
+
+setInterval(() => {
+  if (state.userId) loadNotifications().catch(() => {});
+}, NOTIF_REFRESH_MS);
+
 els.profile.addEventListener('change', () => {
   state.userId = els.profile.value;
   els.message.hidden = true;
-  loadMine().catch((err) => showMessage(err.message, 'error'));
+  Promise.all([loadMine(), loadNotifications()]).catch((err) => showMessage(err.message, 'error'));
 });
 
-Promise.all([loadProfiles(), loadCatalogue(), loadMine()]).catch((err) => showMessage(err.message, 'error'));
+Promise.all([loadProfiles(), loadCatalogue(), loadMine(), loadNotifications()]).catch((err) => showMessage(err.message, 'error'));

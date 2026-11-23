@@ -43,11 +43,25 @@
     .badge.accepted { background: var(--accent-soft); color: var(--accent); }
     .badge.refused { background: var(--err-soft); color: var(--err); }
     .badge.returned { background: #eee; color: var(--muted); }
+    .bell { color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+    .count { background: #fff; color: var(--accent); border-radius: 999px; padding: 0 8px; font-weight: 700; font-size: .85rem; }
+    .count.zero { background: transparent; color: #fff; border: 1px solid #fff; }
+    .notif-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .notif-head h2 { margin: 0; }
+    #notif-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+    #notif-list li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; display: grid; gap: 6px; }
+    #notif-list li.unread { border-color: var(--accent); background: var(--accent-soft); }
+    .notif-time { color: var(--muted); font-size: .85rem; }
+    #notif-list .badge { justify-self: start; grid-row: auto; grid-column: auto; }
+    .notif-actions { display: flex; gap: 8px; }
+    .notif-actions button { cursor: pointer; }
+    .notif-actions .accept { background: var(--accent); color: #fff; border: none; }
   </style>
 </head>
 <body>
   <header>
     <h1>BricoLoop</h1>
+    <a href="#notifications" class="bell" id="bell" hidden>Notifications <span id="unread" class="count">0</span></a>
     <label>Je suis
       <select id="profile" aria-label="Choisir mon profil">
         <option value="">— Choisis ton profil —</option>
@@ -68,6 +82,13 @@
     <section class="panel">
       <p class="hint" id="detail-hint">Clique sur un outil pour voir sa fiche.</p>
       <div id="detail" hidden></div>
+    </section>
+    <section class="panel mine" id="notifications">
+      <div class="notif-head">
+        <h2>Mes notifications</h2>
+        <button type="button" id="mark-read" hidden>Tout marquer comme lu</button>
+      </div>
+      <ul id="notif-list"></ul>
     </section>
     <section class="panel mine">
       <h2>Mes demandes</h2>

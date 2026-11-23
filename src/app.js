@@ -69,6 +69,21 @@ export function createApp(data = seedData()) {
   app.use(express.static(PUBLIC_DIR));
   app.locals.data = data;
 
+  // US-15 : notifications (en mémoire, comme le reste des données)
+  data.notifications ??= [];
+  const notify = (userId, type, loan, message) => {
+    data.notifications.push({
+      id: `n${data.notifications.length + 1}`,
+      userId,
+      type,
+      loanId: loan.id,
+      toolId: loan.toolId,
+      message,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+  };
+
   app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
   });
@@ -117,6 +132,13 @@ export function createApp(data = seedData()) {
       status: 'pending',
     };
     data.loans.push(loan);
+    // US-15 : le propriétaire est prévenu qu'on veut emprunter son outil
+    notify(
+      tool.ownerId,
+      'loan_requested',
+      loan,
+      `${user.firstName} veut emprunter « ${tool.name} » du ${startDate} au ${endDate}.`,
+    );
     res.status(201).json(loan);
   });
 
@@ -156,7 +178,42 @@ export function createApp(data = seedData()) {
     if (newStatus === 'accepted') {
       tool.status = 'lent';
     }
+    // US-15 : l'emprunteur est prévenu de la réponse du propriétaire
+    notify(
+      loan.borrowerId,
+      newStatus === 'accepted' ? 'loan_accepted' : 'loan_refused',
+      loan,
+      `${user.firstName} a ${newStatus === 'accepted' ? 'accepté' : 'refusé'} ta demande pour « ${tool.name} » du ${loan.startDate} au ${loan.endDate}.`,
+    );
     res.status(200).json({ ...loan, toolStatus: tool.status });
+  });
+
+  // US-15 : mes notifications, les plus récentes d'abord, avec le nombre de non lues
+  app.get('/api/notifications', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const items = data.notifications
+      .filter((n) => n.userId === user.id)
+      .map((n) => {
+        const loan = data.loans.find((l) => l.id === n.loanId);
+        return { ...n, loanStatus: loan ? loan.status : null };
+      })
+      .reverse();
+    res.status(200).json({ unread: items.filter((n) => !n.read).length, items });
+  });
+
+  // US-15 : marquer toutes mes notifications comme lues
+  app.post('/api/notifications/read', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    for (const n of data.notifications) {
+      if (n.userId === user.id) n.read = true;
+    }
+    res.status(200).json({ unread: 0 });
   });
 
   // US-01 : consulter le catalogue des outils
