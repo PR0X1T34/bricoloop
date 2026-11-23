@@ -161,9 +161,18 @@ export function createApp(data = seedData()) {
 
   // US-01 : consulter le catalogue des outils
   // US-11 : ?q=mot-clé cherche dans le nom et la description (sans tenir compte des majuscules)
+  // US-10 : ?category=Perçage ne garde que les outils de cette catégorie (400 si inconnue)
   app.get('/api/tools', (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+    const category = req.query.category;
+    if (category !== undefined && !CATEGORIES.includes(category)) {
+      return res.status(400).json({
+        error: `Catégorie inconnue. Catégories autorisées : ${CATEGORIES.join(', ')}`,
+        field: 'category',
+      });
+    }
     const tools = data.tools
+      .filter((t) => category === undefined || t.category === category)
       .filter(
         (t) => !q || t.name.toLowerCase().includes(q) || (t.description ?? '').toLowerCase().includes(q),
       )
