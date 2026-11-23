@@ -5,106 +5,154 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BricoLoop</title>
   <meta name="description" content="Empruntez les outils de vos voisins en quelques clics.">
+  <meta name="color-scheme" content="light dark">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6f4f'/%3E%3Cpath d='M9 22l9-9m-2-3l6 6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <a class="skip" href="#app">Aller au contenu</a>
   <header class="top">
-    <a class="brand" href="#catalogue-panel">BricoLoop</a>
-    <nav class="nav" aria-label="Navigation">
-      <a href="#catalogue-panel">Catalogue</a>
-      <a href="#espace" id="nav-espace" hidden>Mon espace</a>
-      <a href="#notifications" class="bell" id="bell" hidden>Notifications <span id="unread" class="count zero">0</span></a>
+    <a class="brand" href="#/">BricoLoop</a>
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="#/" data-nav="catalogue">Catalogue</a>
+      <a href="#/demandes" data-nav="demandes" data-auth>Mes demandes</a>
+      <a href="#/mes-outils" data-nav="mes-outils" data-auth>Mes outils</a>
+      <a href="#/notifications" data-nav="notifications" data-auth id="bell">Notifications <span id="unread" class="count zero">0</span></a>
     </nav>
     <div id="profile" class="account"></div>
   </header>
 
   <p id="message" class="message" role="status" hidden></p>
 
-  <section id="auth" class="auth" hidden aria-label="Connexion">
-    <div class="auth-card">
-      <div class="auth-tabs" role="tablist">
-        <button type="button" role="tab" id="tab-login" aria-selected="true">Se connecter</button>
-        <button type="button" role="tab" id="tab-register" aria-selected="false">Créer un compte</button>
-      </div>
-      <form id="login-form" class="stack" novalidate>
-        <label>E-mail <input type="email" name="email" autocomplete="email" required></label>
-        <label>Mot de passe <input type="password" name="password" autocomplete="current-password" required></label>
-        <button type="submit" class="primary">Se connecter</button>
-        <p class="hint">Comptes de démo : <code>alice@bricoloop.test</code>, <code>bruno@bricoloop.test</code>, <code>chloe@bricoloop.test</code>, <code>driss@bricoloop.test</code>. Mot de passe : <code>bricoloop</code>.</p>
-      </form>
-      <form id="register-form" class="stack" hidden novalidate>
-        <label>Prénom <input name="firstName" autocomplete="given-name" required minlength="2" maxlength="40"></label>
-        <label>Quartier <input name="district" required minlength="2" maxlength="40" placeholder="Ex. Centre, Gare…"></label>
-        <label>E-mail <input type="email" name="email" autocomplete="email" required></label>
-        <label>Mot de passe (8 caractères minimum) <input type="password" name="password" autocomplete="new-password" required minlength="8"></label>
-        <button type="submit" class="primary">Créer mon compte</button>
-      </form>
-      <button type="button" class="link-btn" id="auth-close">Continuer sans compte</button>
-    </div>
-  </section>
-
-  <main class="layout">
-    <section class="panel" id="catalogue-panel" aria-labelledby="titre-catalogue">
-      <div class="panel-head">
-        <h2 id="titre-catalogue">Catalogue</h2>
-        <span class="muted" id="catalogue-count"></span>
+  <main id="app" class="app" tabindex="-1">
+    <!-- Catalogue (US-01, US-10, US-11) -->
+    <section class="page" data-page="catalogue" aria-labelledby="titre-catalogue">
+      <div class="page-head">
+        <div>
+          <h1 id="titre-catalogue">Les outils de tes voisins</h1>
+          <p class="muted" id="catalogue-count"></p>
+        </div>
+        <a class="button primary" href="#/proposer" data-auth>Proposer un outil</a>
       </div>
       <div class="filters">
-        <input type="search" id="search" placeholder="Rechercher un outil…" aria-label="Rechercher un outil">
-        <select id="category" aria-label="Filtrer par catégorie">
+        <input type="search" id="search" placeholder="Rechercher (perceuse, échelle…)" aria-label="Rechercher un outil">
+        <select id="category" aria-label="Catégorie">
           <option value="">Toutes les catégories</option>
         </select>
+        <select id="district" aria-label="Quartier">
+          <option value="">Tous les quartiers</option>
+        </select>
+        <select id="sort" aria-label="Trier">
+          <option value="status">Disponibles d'abord</option>
+          <option value="name">Nom (A → Z)</option>
+          <option value="recent">Plus récents</option>
+        </select>
+        <label class="check"><input type="checkbox" id="only-available"> Disponibles uniquement</label>
       </div>
       <ul id="catalogue" class="cards"></ul>
     </section>
 
-    <section class="panel" aria-label="Fiche de l'outil">
-      <p class="hint" id="detail-hint">Clique sur un outil pour voir sa fiche.</p>
-      <div id="detail" hidden></div>
+    <!-- Page d'un outil (US-03, US-04, US-14, US-20) -->
+    <section class="page" data-page="outil" hidden>
+      <a href="#/" class="back">← Retour au catalogue</a>
+      <div id="detail"></div>
     </section>
 
-    <div id="espace" class="espace">
-      <section class="panel wide" id="guest-cta">
-        <h2>Prête et emprunte entre voisins</h2>
-        <p class="muted">Connecte-toi pour demander un outil, proposer les tiens et suivre tes prêts.</p>
-        <button type="button" class="primary" id="cta-login">Se connecter ou créer un compte</button>
-      </section>
+    <!-- Modifier un outil (US-16, US-17) -->
+    <section class="page" data-page="modifier" hidden>
+      <a href="#/mes-outils" class="back">← Retour à mes outils</a>
+      <div id="edit-tool"></div>
+    </section>
 
-      <section class="panel wide" id="notifications" hidden>
-        <div class="panel-head">
-          <h2>Mes notifications</h2>
-          <button type="button" id="mark-read" hidden>Tout marquer comme lu</button>
+    <!-- Proposer un outil (US-02, US-17) -->
+    <section class="page narrow" data-page="proposer" hidden>
+      <a href="#/mes-outils" class="back">← Retour à mes outils</a>
+      <h1>Proposer un outil au prêt</h1>
+      <form id="new-tool" class="stack panel" novalidate>
+        <div class="row">
+          <label>Nom <input name="name" required minlength="2" maxlength="60" placeholder="Ex. Ponceuse orbitale"></label>
+          <label>Catégorie <select name="category" required></select></label>
         </div>
-        <ul id="notif-list" class="list"></ul>
-      </section>
+        <label>Description (facultative, 300 caractères) <textarea name="description" maxlength="300" rows="3" placeholder="Marque, accessoires fournis, conseils d'utilisation…"></textarea></label>
+        <label>Photos (4 maximum) <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/gif" multiple></label>
+        <div class="preview" id="new-tool-preview"></div>
+        <div class="row-actions">
+          <button type="submit" class="primary">Proposer l'outil</button>
+          <a class="button" href="#/mes-outils">Annuler</a>
+        </div>
+      </form>
+    </section>
 
-      <section class="panel wide" id="my-tools-panel" hidden>
-        <div class="panel-head">
-          <h2>Mes outils</h2>
-          <button type="button" class="primary" id="show-new-tool">Proposer un outil</button>
+    <!-- Mes outils (US-12, US-13, US-16) -->
+    <section class="page" data-page="mes-outils" hidden>
+      <div class="page-head">
+        <div>
+          <h1>Mes outils</h1>
+          <p class="muted">Les outils que tu prêtes, les demandes reçues et les prêts en cours.</p>
         </div>
-        <form id="new-tool" class="stack box" hidden novalidate>
-          <h3>Proposer un outil au prêt</h3>
-          <div class="row">
-            <label>Nom <input name="name" required minlength="2" maxlength="60" placeholder="Ex. Ponceuse orbitale"></label>
-            <label>Catégorie <select name="category" required></select></label>
-          </div>
-          <label>Description (facultative) <textarea name="description" maxlength="300" rows="2"></textarea></label>
-          <label>Photos (4 maximum) <input type="file" name="photos" accept="image/jpeg,image/png,image/webp,image/gif" multiple></label>
-          <div class="row-actions">
-            <button type="submit" class="primary">Proposer l'outil</button>
-            <button type="button" id="cancel-new-tool">Annuler</button>
-          </div>
+        <a class="button primary" href="#/proposer">Proposer un outil</a>
+      </div>
+      <ul id="my-tools" class="list"></ul>
+    </section>
+
+    <!-- Mes demandes (US-08, US-20) -->
+    <section class="page" data-page="demandes" hidden>
+      <div class="page-head">
+        <div>
+          <h1>Mes demandes</h1>
+          <p class="muted">Ce que tu as demandé à emprunter, du plus proche au plus lointain.</p>
+        </div>
+      </div>
+      <div id="mine"></div>
+    </section>
+
+    <!-- Notifications (US-15) -->
+    <section class="page" data-page="notifications" hidden>
+      <div class="page-head">
+        <h1>Notifications</h1>
+        <button type="button" id="mark-read" hidden>Tout marquer comme lu</button>
+      </div>
+      <ul id="notif-list" class="list"></ul>
+    </section>
+
+    <!-- Mon compte (US-18, US-20) -->
+    <section class="page narrow" data-page="compte" hidden>
+      <h1>Mon compte</h1>
+      <div id="account-page"></div>
+    </section>
+
+    <!-- Connexion et inscription (US-18) -->
+    <section class="page narrow" data-page="connexion" hidden>
+      <h1>Bienvenue sur BricoLoop</h1>
+      <p class="muted">Connecte-toi pour emprunter un outil, prêter les tiens et suivre tes prêts.</p>
+      <div class="panel">
+        <div class="auth-tabs" role="tablist">
+          <button type="button" role="tab" id="tab-login" aria-selected="true">Se connecter</button>
+          <button type="button" role="tab" id="tab-register" aria-selected="false">Créer un compte</button>
+        </div>
+        <form id="login-form" class="stack" novalidate>
+          <label>E-mail <input type="email" name="email" autocomplete="email" required></label>
+          <label>Mot de passe <input type="password" name="password" autocomplete="current-password" required></label>
+          <button type="submit" class="primary">Se connecter</button>
+          <p class="hint">Comptes de démo : <code>alice@bricoloop.test</code>, <code>bruno@bricoloop.test</code>, <code>chloe@bricoloop.test</code>, <code>driss@bricoloop.test</code>. Mot de passe : <code>bricoloop</code>.</p>
         </form>
-        <ul id="my-tools" class="list"></ul>
-      </section>
+        <form id="register-form" class="stack" hidden novalidate>
+          <div class="row">
+            <label>Prénom <input name="firstName" autocomplete="given-name" required minlength="2" maxlength="40"></label>
+            <label>Quartier <input name="district" required minlength="2" maxlength="40" placeholder="Ex. Centre, Gare…"></label>
+          </div>
+          <label>E-mail <input type="email" name="email" autocomplete="email" required></label>
+          <label>Mot de passe (8 caractères minimum) <input type="password" name="password" autocomplete="new-password" required minlength="8"></label>
+          <button type="submit" class="primary">Créer mon compte</button>
+        </form>
+      </div>
+    </section>
 
-      <section class="panel wide" id="mine-panel" hidden>
-        <h2>Mes demandes</h2>
-        <ul id="mine" class="list"></ul>
-      </section>
-    </div>
+    <!-- Page introuvable -->
+    <section class="page narrow" data-page="introuvable" hidden>
+      <h1>Page introuvable</h1>
+      <p class="muted">Cette adresse ne correspond à rien. <a href="#/">Retour au catalogue</a>.</p>
+    </section>
   </main>
 
   <footer class="foot">BricoLoop · équipe Jus de Bissap · atelier Scrum EPSI B3</footer>

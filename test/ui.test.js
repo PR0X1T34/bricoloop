@@ -90,3 +90,19 @@ describe('Interface web : comptes, modification, photos (US-16 à US-18)', () =>
     expect(res.headers['content-type']).toMatch(/css/);
   });
 });
+
+describe('Interface web : une page par onglet (US-20)', () => {
+  it('a une page pour le catalogue, un outil, mes outils, mes demandes, les notifications, le compte et la connexion', async () => {
+    const page = await request(createApp()).get('/');
+    for (const name of ['catalogue', 'outil', 'modifier', 'proposer', 'mes-outils', 'demandes', 'notifications', 'compte', 'connexion', 'introuvable']) {
+      expect(page.text).toContain(`data-page="${name}"`);
+    }
+  });
+
+  it("affiche l'état d'un outil, ses réservations et permet d'annuler une demande", async () => {
+    const script = await request(createApp()).get('/main.js');
+    expect(script.text).toContain('tool.activity');
+    expect(script.text).toContain('/cancel');
+    expect(script.text).toContain("api('/api/auth/me/stats')");
+  });
+});
