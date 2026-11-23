@@ -1,12 +1,18 @@
+import { hashPassword } from './auth.js';
+
+// Comptes de démo : mot de passe commun (calculé une seule fois au chargement)
+export const DEMO_PASSWORD = 'bricoloop';
+const DEMO_HASH = hashPassword(DEMO_PASSWORD);
+
 export const CATEGORIES = ['Perçage', 'Jardinage', 'Peinture', 'Nettoyage', 'Mesure', 'Autre'];
 
 export function seedData() {
   return {
     users: [
-      { id: 'u1', firstName: 'Alice', district: 'Centre' },
-      { id: 'u2', firstName: 'Bruno', district: 'Gare' },
-      { id: 'u3', firstName: 'Chloé', district: 'Vieux Port' },
-      { id: 'u4', firstName: 'Driss', district: 'Les Halles' },
+      { id: 'u1', firstName: 'Alice', district: 'Centre', email: 'alice@bricoloop.test', passwordHash: DEMO_HASH },
+      { id: 'u2', firstName: 'Bruno', district: 'Gare', email: 'bruno@bricoloop.test', passwordHash: DEMO_HASH },
+      { id: 'u3', firstName: 'Chloé', district: 'Vieux Port', email: 'chloe@bricoloop.test', passwordHash: DEMO_HASH },
+      { id: 'u4', firstName: 'Driss', district: 'Les Halles', email: 'driss@bricoloop.test', passwordHash: DEMO_HASH },
     ],
     tools: [
       { id: 't1', ownerId: 'u1', name: 'Perceuse à percussion', category: 'Perçage', description: 'Bosch 750 W, coffret de forets inclus', status: 'available' },

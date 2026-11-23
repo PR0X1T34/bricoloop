@@ -34,19 +34,37 @@ npm run check    # lint (0 warning) + tests
 
 Vérification rapide : `curl http://localhost:3000/health` → `{"status":"ok"}`
 
-Identification : l'utilisateur courant est passé dans l'en-tête HTTP `X-User-Id` (ex. `u1`).
-Données de démo : 4 voisins (`u1` à `u4`) et 8 outils, chargés au démarrage (`src/seed.js`).
+### Comptes et connexion (US-18)
 
-Interface web : ouvrir http://localhost:3000 dans un navigateur, choisir son profil, puis parcourir le catalogue, ouvrir une fiche et envoyer une demande.
+Sur le site, chacun se connecte avec son compte (ou en crée un depuis la page).
+Comptes de démo : `alice@bricoloop.test`, `bruno@bricoloop.test`, `chloe@bricoloop.test`, `driss@bricoloop.test`, mot de passe `bricoloop`.
+
+- Les mots de passe sont hachés (scrypt avec sel), jamais stockés en clair.
+- La connexion renvoie un jeton à envoyer dans l'en-tête `Authorization: Bearer <jeton>` (valable 7 jours).
+- L'identification par l'en-tête `X-User-Id` de l'énoncé reste disponible pour les tests et pour démontrer l'API : lancer avec `ALLOW_USER_ID_HEADER=1 npm start`. Elle est désactivée par défaut sur le vrai serveur.
+
+### Données (US-19)
+
+Les données sont enregistrées dans `data/bricoloop.json` (créé au premier changement, ignoré par Git) : comptes, outils, photos et prêts sont conservés après un redémarrage.
+Pour repartir des données de démo, supprimer ce fichier. `DATA_FILE=memory npm start` garde tout en mémoire.
+
+### Interface web
+
+Ouvrir http://localhost:3000 : rechercher ou filtrer le catalogue, ouvrir une fiche et ses photos, se connecter pour emprunter.
+Dans « Mon espace » : notifications, mes outils (accepter ou refuser une demande, déclarer un retour, noter l'emprunteur, modifier, supprimer, ajouter des photos), proposer un outil, mes demandes.
 
 ## API
 
-Toutes les routes répondent en JSON. Celles qui ont « oui » dans la colonne `X-User-Id` renvoient 401 sans cet en-tête.
+Toutes les routes répondent en JSON (sauf les photos). Celles qui ont « oui » dans la colonne « Compte » renvoient 401 sans utilisateur identifié : jeton `Authorization: Bearer …`, ou en-tête `X-User-Id` en mode énoncé.
 
-| Méthode | Route | X-User-Id | Story | Description |
+| Méthode | Route | Compte | Story | Description |
 |---|---|---|---|---|
 | GET | `/health` |  | T-02 | Vérifie que l'API répond |
-| GET | `/api/users` |  | US-09 | Liste des voisins (sélecteur de profil) |
+| POST | `/api/auth/register` |  | US-18 | Créer un compte : `email`, `password` (8 caractères minimum), `firstName`, `district` |
+| POST | `/api/auth/login` |  | US-18 | Se connecter : `email`, `password` → `{ token, user }` |
+| POST | `/api/auth/logout` | oui | US-18 | Se déconnecter (le jeton n'est plus valable) |
+| GET | `/api/auth/me` | oui | US-18 | Mon compte |
+| GET | `/api/users` |  | US-09 | Liste publique des voisins (prénom et quartier) |
 | GET | `/api/tools` |  | US-01 | Catalogue, outils disponibles en premier |
 | GET | `/api/tools?q=perceuse` |  | US-11 | Recherche dans le nom et la description, sans tenir compte des majuscules |
 | GET | `/api/tools?category=Perçage` |  | US-10 | Filtre par catégorie (400 si la catégorie est inconnue), combinable avec `q` |
@@ -54,6 +72,11 @@ Toutes les routes répondent en JSON. Celles qui ont « oui » dans la colonne `
 | GET | `/api/tools/:id/history` | oui | US-14 | Historique des prêts acceptés et rendus, du plus récent au plus ancien (propriétaire seulement) |
 | GET | `/api/tools/:id` |  | US-03 | Fiche d'un outil avec le prénom et le quartier du propriétaire (404 si inconnu) |
 | POST | `/api/tools` | oui | US-02 | Proposer un outil : `name` (2 à 60), `category`, `description` (facultative, 300 max) |
+| PATCH | `/api/tools/:id` | oui | US-16 | Modifier mon outil (`name`, `category`, `description`, `status` disponible ou indisponible) |
+| DELETE | `/api/tools/:id` | oui | US-16 | Retirer mon outil (409 s'il est prêté ; les demandes en attente sont annulées) |
+| POST | `/api/tools/:id/photos` | oui | US-17 | Ajouter une photo : `dataUrl` JPEG, PNG, WebP ou GIF, 2 Mo et 4 photos maximum |
+| DELETE | `/api/tools/:id/photos/:photoId` | oui | US-17 | Supprimer une photo |
+| GET | `/api/photos/:photoId` |  | US-17 | Afficher une photo |
 | POST | `/api/loans` | oui | US-04, US-06 | Demander un emprunt : `toolId`, `startDate`, `endDate` (`AAAA-MM-JJ`) |
 | POST | `/api/loans/:id/accept` | oui | US-05 | Le propriétaire accepte une demande (l'outil passe « prêté ») |
 | POST | `/api/loans/:id/refuse` | oui | US-05 | Le propriétaire refuse une demande |
@@ -104,12 +127,16 @@ test/           tests Vitest + Supertest
 | US-07 · Déclarer le retour d'un outil | #8 |
 | US-08 · Voir mes emprunts | #9 |
 | US-09 · Interface web du parcours d'emprunt | #11 |
-| US-10 · Filtrer le catalogue par catégorie | _PR à venir_ |
+| US-10 · Filtrer le catalogue par catégorie | #15 |
 | US-11 · Rechercher un outil par mot-clé | #12 |
-| US-12 · Voir mes outils et les demandes reçues | _PR à venir_ |
-| US-13 · Noter l'emprunteur après le retour | _PR à venir_ |
-| US-14 · Consulter l'historique des prêts d'un outil | _PR à venir_ |
-| US-15 · Notifications (ajoutée au backlog par l'équipe) | _PR à venir_ |
+| US-12 · Voir mes outils et les demandes reçues | #16 |
+| US-13 · Noter l'emprunteur après le retour | #16 |
+| US-14 · Consulter l'historique des prêts d'un outil | #16 |
+| US-15 · Notifications (ajoutée au backlog par l'équipe) | #16 |
+| US-16 · Modifier et supprimer ses outils (ajoutée par l'équipe) | _PR à venir_ |
+| US-17 · Photos des outils (ajoutée par l'équipe) | _PR à venir_ |
+| US-18 · Comptes et connexion (ajoutée par l'équipe) | _PR à venir_ |
+| US-19 · Sauvegarde dans un fichier JSON (ajoutée par l'équipe) | _PR à venir_ |
 
 État de `main` : `npm run check` → 0 warning de lint, 83 tests verts.
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { CATEGORIES, seedData } from './seed.js';
+import { hashPassword, newToken, verifyPassword, SESSION_DAYS } from './auth.js';
 
 // US-09 : dossier de l'interface web (servie sur /)
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
@@ -63,11 +64,44 @@ function isValidDate(value) {
   );
 }
 
-export function createApp(data = seedData()) {
+// options.allowUserIdHeader : accepte l'en-tête X-User-Id de l'énoncé (tests, démo de l'API).
+// Le serveur réel (src/server.js) le désactive : il faut alors un compte et un jeton de session.
+// options.onChange : appelé après chaque requête qui modifie les données (sauvegarde sur disque).
+export function createApp(data = seedData(), options = {}) {
+  const allowUserIdHeader = options.allowUserIdHeader ?? true;
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '8mb' }));
   app.use(express.static(PUBLIC_DIR));
   app.locals.data = data;
+  data.sessions ??= [];
+  data.photos ??= [];
+
+  if (options.onChange) {
+    app.use((req, res, next) => {
+      if (req.method !== 'GET') res.on('finish', () => res.statusCode < 400 && options.onChange(data));
+      next();
+    });
+  }
+
+  // Utilisateur courant : jeton « Authorization: Bearer … », ou X-User-Id si autorisé
+  const sessionFor = (req) => {
+    const match = /^Bearer ([a-f0-9]{64})$/.exec(req.get('Authorization') ?? '');
+    if (!match) return null;
+    const session = data.sessions.find((s) => s.token === match[1]);
+    if (!session) return null;
+    if (Date.now() - Date.parse(session.createdAt) > SESSION_DAYS * 86400000) {
+      data.sessions = data.sessions.filter((s) => s !== session);
+      return null;
+    }
+    return session;
+  };
+  const currentUser = (req) => {
+    const session = sessionFor(req);
+    if (session) return data.users.find((u) => u.id === session.userId) ?? null;
+    if (allowUserIdHeader) return data.users.find((u) => u.id === req.get('X-User-Id')) ?? null;
+    return null;
+  };
+  const publicUser = ({ id, firstName, district, email }) => ({ id, firstName, district, email });
 
   // US-15 : notifications (en mémoire, comme le reste des données)
   data.notifications ??= [];
@@ -95,7 +129,7 @@ export function createApp(data = seedData()) {
 
   // US-04 : demander l'emprunt d'un outil
   app.post('/api/loans', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -150,7 +184,7 @@ export function createApp(data = seedData()) {
     if (!newStatus) {
       return next();
     }
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -190,7 +224,7 @@ export function createApp(data = seedData()) {
 
   // US-15 : mes notifications, les plus récentes d'abord, avec le nombre de non lues
   app.get('/api/notifications', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -206,7 +240,7 @@ export function createApp(data = seedData()) {
 
   // US-15 : marquer toutes mes notifications comme lues
   app.post('/api/notifications/read', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -214,6 +248,198 @@ export function createApp(data = seedData()) {
       if (n.userId === user.id) n.read = true;
     }
     res.status(200).json({ unread: 0 });
+  });
+
+  // US-18 : créer un compte, se connecter, se déconnecter
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const openSession = (user) => {
+    const token = newToken();
+    data.sessions.push({ token, userId: user.id, createdAt: new Date().toISOString() });
+    return { token, user: publicUser(user) };
+  };
+
+  app.post('/api/auth/register', (req, res) => {
+    const { email, password, firstName, district } = req.body ?? {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanName = typeof firstName === 'string' ? firstName.trim() : '';
+    const cleanDistrict = typeof district === 'string' ? district.trim() : '';
+    if (!EMAIL_RE.test(cleanEmail) || cleanEmail.length > 120) {
+      return res.status(400).json({ error: "L'adresse e-mail n'est pas valide", field: 'email' });
+    }
+    if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: 'Le mot de passe doit contenir entre 8 et 128 caractères', field: 'password' });
+    }
+    if (cleanName.length < 2 || cleanName.length > 40) {
+      return res.status(400).json({ error: 'Le prénom doit contenir entre 2 et 40 caractères', field: 'firstName' });
+    }
+    if (cleanDistrict.length < 2 || cleanDistrict.length > 40) {
+      return res.status(400).json({ error: 'Le quartier doit contenir entre 2 et 40 caractères', field: 'district' });
+    }
+    if (data.users.some((u) => u.email === cleanEmail)) {
+      return res.status(409).json({ error: 'Un compte existe déjà avec cette adresse e-mail', field: 'email' });
+    }
+    const max = data.users.reduce((m, u) => Math.max(m, Number(String(u.id).slice(1)) || 0), 0);
+    const user = {
+      id: `u${max + 1}`,
+      firstName: cleanName,
+      district: cleanDistrict,
+      email: cleanEmail,
+      passwordHash: hashPassword(password),
+    };
+    data.users.push(user);
+    res.status(201).json(openSession(user));
+  });
+
+  app.post('/api/auth/login', (req, res) => {
+    const { email, password } = req.body ?? {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const user = data.users.find((u) => u.email === cleanEmail);
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      return res.status(401).json({ error: 'E-mail ou mot de passe incorrect' });
+    }
+    res.status(200).json(openSession(user));
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    const session = sessionFor(req);
+    if (session) data.sessions = data.sessions.filter((s) => s !== session);
+    res.status(200).json({ ok: true });
+  });
+
+  app.get('/api/auth/me', (req, res) => {
+    const user = currentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    res.status(200).json(publicUser(user));
+  });
+
+  // US-16 : modifier un outil que je prête (champs envoyés seulement)
+  const ownTool = (req, res) => {
+    const user = currentUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Utilisateur non identifié' });
+      return null;
+    }
+    const tool = data.tools.find((t) => t.id === req.params.id);
+    if (!tool) {
+      res.status(404).json({ error: 'Outil introuvable' });
+      return null;
+    }
+    if (tool.ownerId !== user.id) {
+      res.status(403).json({ error: 'Seul le propriétaire peut modifier cet outil' });
+      return null;
+    }
+    return { user, tool };
+  };
+
+  app.patch('/api/tools/:id', (req, res) => {
+    const found = ownTool(req, res);
+    if (!found) return;
+    const { tool } = found;
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const result = validateToolInput({
+      name: body.name ?? tool.name,
+      category: body.category ?? tool.category,
+      description: body.description ?? tool.description,
+    });
+    if (result.error) {
+      return res.status(400).json({ error: result.error, field: result.field });
+    }
+    if (body.status !== undefined) {
+      if (!['available', 'unavailable'].includes(body.status)) {
+        return res.status(400).json({ error: 'Le statut doit être « available » ou « unavailable »', field: 'status' });
+      }
+      if (tool.status === 'lent') {
+        return res.status(409).json({ error: "L'outil est prêté : déclarez d'abord son retour" });
+      }
+      tool.status = body.status;
+    }
+    Object.assign(tool, result.value);
+    res.status(200).json(toolView(tool));
+  });
+
+  // US-16 : retirer un outil du prêt
+  app.delete('/api/tools/:id', (req, res) => {
+    const found = ownTool(req, res);
+    if (!found) return;
+    const { user, tool } = found;
+    if (data.loans.some((l) => l.toolId === tool.id && l.status === 'accepted')) {
+      return res.status(409).json({ error: "L'outil est prêté en ce moment : déclarez d'abord son retour" });
+    }
+    for (const loan of data.loans.filter((l) => l.toolId === tool.id)) {
+      loan.toolName = tool.name;
+      if (loan.status === 'pending') {
+        loan.status = 'refused';
+        notify(loan.borrowerId, 'loan_refused', loan, `${user.firstName} a retiré « ${tool.name} » du prêt : ta demande est annulée.`);
+      }
+    }
+    data.photos = data.photos.filter((ph) => ph.toolId !== tool.id);
+    data.tools = data.tools.filter((t) => t !== tool);
+    res.status(204).end();
+  });
+
+  // US-17 : photos des outils (JPEG, PNG, WebP ou GIF, 2 Mo maximum, 4 par outil)
+  const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+  const PHOTOS_PER_TOOL = 4;
+  const photoUrl = (photo) => `/api/photos/${photo.id}`;
+  const toolPhotos = (tool) => data.photos.filter((ph) => ph.toolId === tool.id);
+  const toolView = (tool) => {
+    const owner = data.users.find((u) => u.id === tool.ownerId);
+    return {
+      id: tool.id,
+      ownerId: tool.ownerId,
+      name: tool.name,
+      category: tool.category,
+      description: tool.description ?? '',
+      status: tool.status,
+      photos: toolPhotos(tool).map((ph) => ({ id: ph.id, url: photoUrl(ph) })),
+      owner: owner ? { firstName: owner.firstName, district: owner.district } : null,
+    };
+  };
+
+  app.post('/api/tools/:id/photos', (req, res) => {
+    const found = ownTool(req, res);
+    if (!found) return;
+    const { tool } = found;
+    const match = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(req.body?.dataUrl ?? '');
+    if (!match || !PHOTO_TYPES.includes(match[1])) {
+      return res.status(400).json({ error: 'La photo doit être une image JPEG, PNG, WebP ou GIF', field: 'dataUrl' });
+    }
+    const bytes = Buffer.from(match[2], 'base64');
+    if (bytes.length === 0 || bytes.length > PHOTO_MAX_BYTES) {
+      return res.status(400).json({ error: 'La photo doit peser moins de 2 Mo', field: 'dataUrl' });
+    }
+    if (toolPhotos(tool).length >= PHOTOS_PER_TOOL) {
+      return res.status(409).json({ error: `Un outil a au maximum ${PHOTOS_PER_TOOL} photos` });
+    }
+    const max = data.photos.reduce((m, ph) => Math.max(m, Number(String(ph.id).slice(1)) || 0), 0);
+    const photo = { id: `p${max + 1}`, toolId: tool.id, mime: match[1], data: match[2] };
+    data.photos.push(photo);
+    res.status(201).json({ id: photo.id, url: photoUrl(photo) });
+  });
+
+  app.delete('/api/tools/:id/photos/:photoId', (req, res) => {
+    const found = ownTool(req, res);
+    if (!found) return;
+    const photo = data.photos.find((ph) => ph.id === req.params.photoId && ph.toolId === found.tool.id);
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo introuvable' });
+    }
+    data.photos = data.photos.filter((ph) => ph !== photo);
+    res.status(204).end();
+  });
+
+  app.get('/api/photos/:photoId', (req, res) => {
+    const photo = data.photos.find((ph) => ph.id === req.params.photoId);
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo introuvable' });
+    }
+    res
+      .status(200)
+      .set({ 'Content-Type': photo.mime, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'public, max-age=86400' })
+      .send(Buffer.from(photo.data, 'base64'));
   });
 
   // US-01 : consulter le catalogue des outils
@@ -234,13 +460,16 @@ export function createApp(data = seedData()) {
         (t) => !q || t.name.toLowerCase().includes(q) || (t.description ?? '').toLowerCase().includes(q),
       )
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
-      .map(({ id, name, category, status }) => ({ id, name, category, status }));
+      .map((t) => {
+        const first = toolPhotos(t)[0];
+        return { id: t.id, name: t.name, category: t.category, status: t.status, photo: first ? photoUrl(first) : null };
+      });
     res.status(200).json(tools);
   });
 
   // US-02 : proposer un outil au prêt
   app.post('/api/tools', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -281,7 +510,7 @@ export function createApp(data = seedData()) {
 
   // US-12 : mes outils, avec le nombre de demandes en attente et le prêt en cours
   app.get('/api/tools/mine', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -298,7 +527,9 @@ export function createApp(data = seedData()) {
           id: t.id,
           name: t.name,
           category: t.category,
+          description: t.description ?? '',
           status: t.status,
+          photos: toolPhotos(t).map((ph) => ({ id: ph.id, url: photoUrl(ph) })),
           pendingRequests: pending.length,
           requests: pending,
           currentLoan: current ? loanView(current) : null,
@@ -309,7 +540,7 @@ export function createApp(data = seedData()) {
 
   // US-14 : historique des prêts d'un outil (acceptés et rendus), du plus récent au plus ancien
   app.get('/api/tools/:id/history', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -329,7 +560,7 @@ export function createApp(data = seedData()) {
 
   // US-13 : noter l'emprunteur après le retour (1 à 5, une seule note par prêt)
   app.post('/api/loans/:id/rating', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -358,7 +589,7 @@ export function createApp(data = seedData()) {
 
   // US-08 : voir mes demandes et mes emprunts
   app.get('/api/loans/mine', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
@@ -367,7 +598,7 @@ export function createApp(data = seedData()) {
       .sort((a, b) => a.startDate.localeCompare(b.startDate))
       .map((l) => ({
         ...l,
-        toolName: data.tools.find((t) => t.id === l.toolId)?.name ?? null,
+        toolName: data.tools.find((t) => t.id === l.toolId)?.name ?? l.toolName ?? null,
       }));
     res.status(200).json(loans);
   });
@@ -378,20 +609,12 @@ export function createApp(data = seedData()) {
     if (!tool) {
       return res.status(404).json({ error: 'Outil introuvable' });
     }
-    const owner = data.users.find((u) => u.id === tool.ownerId);
-    res.status(200).json({
-      id: tool.id,
-      name: tool.name,
-      category: tool.category,
-      description: tool.description ?? '',
-      status: tool.status,
-      owner: owner ? { firstName: owner.firstName, district: owner.district } : null,
-    });
+    res.status(200).json(toolView(tool));
   });
 
   // US-07 : déclarer le retour d'un outil
   app.post('/api/loans/:id/return', (req, res) => {
-    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    const user = currentUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
