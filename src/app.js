@@ -258,6 +258,104 @@ export function createApp(data = seedData()) {
     res.status(201).location(`/api/tools/${tool.id}`).json(tool);
   });
 
+  // US-13 : note moyenne d'un emprunteur (null s'il n'a jamais été noté)
+  const borrowerRating = (userId) => {
+    const scores = data.loans.filter((l) => l.borrowerId === userId && l.rating).map((l) => l.rating);
+    if (scores.length === 0) return null;
+    const average = scores.reduce((s, n) => s + n, 0) / scores.length;
+    return { average: Math.round(average * 10) / 10, count: scores.length };
+  };
+  const loanView = (l) => {
+    const borrower = data.users.find((u) => u.id === l.borrowerId);
+    return {
+      id: l.id,
+      startDate: l.startDate,
+      endDate: l.endDate,
+      status: l.status,
+      rating: l.rating ?? null,
+      borrower: borrower
+        ? { id: borrower.id, firstName: borrower.firstName, district: borrower.district, rating: borrowerRating(borrower.id) }
+        : null,
+    };
+  };
+
+  // US-12 : mes outils, avec le nombre de demandes en attente et le prêt en cours
+  app.get('/api/tools/mine', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const tools = data.tools
+      .filter((t) => t.ownerId === user.id)
+      .map((t) => {
+        const loans = data.loans.filter((l) => l.toolId === t.id);
+        const pending = loans
+          .filter((l) => l.status === 'pending')
+          .sort((a, b) => a.startDate.localeCompare(b.startDate))
+          .map(loanView);
+        const current = loans.find((l) => l.status === 'accepted');
+        return {
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          status: t.status,
+          pendingRequests: pending.length,
+          requests: pending,
+          currentLoan: current ? loanView(current) : null,
+        };
+      });
+    res.status(200).json(tools);
+  });
+
+  // US-14 : historique des prêts d'un outil (acceptés et rendus), du plus récent au plus ancien
+  app.get('/api/tools/:id/history', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const tool = data.tools.find((t) => t.id === req.params.id);
+    if (!tool) {
+      return res.status(404).json({ error: 'Outil introuvable' });
+    }
+    if (tool.ownerId !== user.id) {
+      return res.status(403).json({ error: "Seul le propriétaire peut voir l'historique de ses prêts" });
+    }
+    const history = data.loans
+      .filter((l) => l.toolId === tool.id && (l.status === 'accepted' || l.status === 'returned'))
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      .map(loanView);
+    res.status(200).json(history);
+  });
+
+  // US-13 : noter l'emprunteur après le retour (1 à 5, une seule note par prêt)
+  app.post('/api/loans/:id/rating', (req, res) => {
+    const user = data.users.find((u) => u.id === req.get('X-User-Id'));
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const loan = data.loans.find((l) => l.id === req.params.id);
+    if (!loan) {
+      return res.status(404).json({ error: 'Prêt introuvable' });
+    }
+    const tool = data.tools.find((t) => t.id === loan.toolId);
+    if (!tool || tool.ownerId !== user.id) {
+      return res.status(403).json({ error: "Seul le propriétaire de l'outil peut noter l'emprunteur" });
+    }
+    const score = req.body?.score;
+    if (!Number.isInteger(score) || score < 1 || score > 5) {
+      return res.status(400).json({ error: 'La note doit être un nombre entier de 1 à 5', field: 'score' });
+    }
+    if (loan.status !== 'returned') {
+      return res.status(409).json({ error: 'On ne peut noter qu’un prêt rendu' });
+    }
+    if (loan.rating) {
+      return res.status(409).json({ error: 'Ce prêt a déjà été noté' });
+    }
+    loan.rating = score;
+    notify(loan.borrowerId, 'loan_rated', loan, `${user.firstName} t'a donné ${score}/5 pour l'emprunt de « ${tool.name} ».`);
+    res.status(200).json(loanView(loan));
+  });
+
   // US-08 : voir mes demandes et mes emprunts
   app.get('/api/loans/mine', (req, res) => {
     const user = data.users.find((u) => u.id === req.get('X-User-Id'));
@@ -310,6 +408,7 @@ export function createApp(data = seedData()) {
     }
     loan.status = 'returned';
     tool.status = 'available';
+    notify(loan.borrowerId, 'loan_returned', loan, `${user.firstName} a confirmé le retour de « ${tool.name} ». Merci !`);
     res.status(200).json({ ...loan, toolStatus: tool.status });
   });
 

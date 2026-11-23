@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BricoLoop</title>
+  <link rel="icon" href="data:,">
   <style>
     :root { --bg: #f6f5f1; --card: #fff; --text: #1f2421; --muted: #6b716d; --line: #e2e0d8; --accent: #2f6f4f; --accent-soft: #e3efe8; --err: #a12c2c; --err-soft: #fbe9e9; }
     * { box-sizing: border-box; }
@@ -56,6 +57,21 @@
     .notif-actions { display: flex; gap: 8px; }
     .notif-actions button { cursor: pointer; }
     .notif-actions .accept { background: var(--accent); color: #fff; border: none; }
+    #my-tools { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 10px; }
+    #my-tools > li { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; }
+    .mt-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .mt-head .badge { grid-row: auto; grid-column: auto; }
+    .mt-count { color: var(--muted); font-size: .9rem; margin-left: auto; }
+    .mt-count.hot { color: #2b4f9c; font-weight: 600; }
+    .sub { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .sub li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; background: var(--bg); border-radius: 6px; padding: 6px 10px; }
+    .sub .badge { grid-row: auto; grid-column: auto; }
+    .row-actions { display: flex; gap: 6px; align-items: center; }
+    .row-actions button, .link-btn { cursor: pointer; }
+    .link-btn { background: none; border: none; color: var(--accent); padding: 0; text-decoration: underline; justify-self: start; }
+    .stars { color: #a06a00; font-size: .85rem; }
+    label.block { display: grid; gap: 4px; margin-bottom: 12px; }
+    textarea { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); resize: vertical; }
   </style>
 </head>
 <body>
@@ -89,6 +105,21 @@
         <button type="button" id="mark-read" hidden>Tout marquer comme lu</button>
       </div>
       <ul id="notif-list"></ul>
+    </section>
+    <section class="panel mine" id="my-tools-panel">
+      <h2>Mes outils</h2>
+      <ul id="my-tools"></ul>
+      <form id="new-tool" hidden>
+        <h3>Proposer un outil au prêt</h3>
+        <div class="dates">
+          <label>Nom <input name="name" required minlength="2" maxlength="60" placeholder="Ex. Ponceuse"></label>
+          <label>Catégorie <select name="category" required></select></label>
+        </div>
+        <label class="block">Description (facultative)
+          <textarea name="description" maxlength="300" rows="2"></textarea>
+        </label>
+        <button type="submit">Proposer l'outil</button>
+      </form>
     </section>
     <section class="panel mine">
       <h2>Mes demandes</h2>
