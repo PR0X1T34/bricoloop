@@ -1,10 +1,14 @@
 // US-09 : parcours d'emprunt (profil → catalogue → fiche → demande)
 import { formatError, statusLabel } from './ui.js';
 
-const state = { userId: '', selectedToolId: null };
+const state = { userId: '', selectedToolId: null, category: '' };
+
+// US-10 : catégories autorisées (énoncé, section 3)
+const CATEGORIES = ['Perçage', 'Jardinage', 'Peinture', 'Nettoyage', 'Mesure', 'Autre'];
 
 const els = {
   profile: document.getElementById('profile'),
+  category: document.getElementById('category'),
   catalogue: document.getElementById('catalogue'),
   detail: document.getElementById('detail'),
   hint: document.getElementById('detail-hint'),
@@ -54,10 +58,12 @@ async function loadProfiles() {
 }
 
 async function loadCatalogue() {
-  const tools = await api('/api/tools');
+  const tools = state.category
+    ? await api(`/api/tools?category=${encodeURIComponent(state.category)}`)
+    : await api('/api/tools');
   els.catalogue.replaceChildren();
   if (tools.length === 0) {
-    els.catalogue.append(el('li', 'Aucun outil pour le moment', 'empty'));
+    els.catalogue.append(el('li', state.category ? 'Aucun outil dans cette catégorie' : 'Aucun outil pour le moment', 'empty'));
     return;
   }
   for (const tool of tools) {
@@ -157,6 +163,17 @@ function renderDetail(tool) {
   els.detail.hidden = false;
   els.hint.hidden = true;
 }
+
+// US-10 : filtrer le catalogue par catégorie
+for (const c of CATEGORIES) {
+  const option = el('option', c);
+  option.value = c;
+  els.category.append(option);
+}
+els.category.addEventListener('change', () => {
+  state.category = els.category.value;
+  loadCatalogue().catch((err) => showMessage(err.message, 'error'));
+});
 
 els.profile.addEventListener('change', () => {
   state.userId = els.profile.value;
