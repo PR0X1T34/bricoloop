@@ -48,10 +48,23 @@ Comptes de démo : `alice@bricoloop.test`, `bruno@bricoloop.test`, `chloe@bricol
 Les données sont enregistrées dans `data/bricoloop.json` (créé au premier changement, ignoré par Git) : comptes, outils, photos et prêts sont conservés après un redémarrage.
 Pour repartir des données de démo, supprimer ce fichier. `DATA_FILE=memory npm start` garde tout en mémoire.
 
-### Interface web
+### Interface web (une page par onglet, US-20)
 
-Ouvrir http://localhost:3000 : rechercher ou filtrer le catalogue, ouvrir une fiche et ses photos, se connecter pour emprunter.
-Dans « Mon espace » : notifications, mes outils (accepter ou refuser une demande, déclarer un retour, noter l'emprunteur, modifier, supprimer, ajouter des photos), proposer un outil, mes demandes.
+Ouvrir http://localhost:3000. Chaque page a sa propre adresse, qu'on peut partager :
+
+| Page | Adresse | Ce qu'on y fait |
+|---|---|---|
+| Catalogue | `#/` | Rechercher, filtrer par catégorie, quartier ou disponibilité, trier |
+| Outil | `#/outil/t1` | Photos, état (prêts, retours, demandes en attente), calendrier des réservations, demande d'emprunt avec un message ; pour le propriétaire : historique, note, modifier, supprimer, rendre indisponible |
+| Modifier | `#/outil/t1/modifier` | Nom, catégorie, description, disponibilité, photos |
+| Proposer | `#/proposer` | Nouvel outil avec photos |
+| Mes outils | `#/mes-outils` | Demandes reçues (avec le message), accepter, refuser, déclarer un retour |
+| Mes demandes | `#/demandes` | En attente (annulables), en cours, terminées |
+| Notifications | `#/notifications` | Accepter ou refuser directement, aller à l'outil |
+| Mon compte | `#/compte` | Mes chiffres, modifier mon profil, changer de mot de passe |
+| Connexion | `#/connexion` | Se connecter ou créer un compte |
+
+Le site suit le thème clair ou sombre de l'appareil et s'utilise sur téléphone.
 
 ## API
 
@@ -64,20 +77,24 @@ Toutes les routes répondent en JSON (sauf les photos). Celles qui ont « oui »
 | POST | `/api/auth/login` |  | US-18 | Se connecter : `email`, `password` → `{ token, user }` |
 | POST | `/api/auth/logout` | oui | US-18 | Se déconnecter (le jeton n'est plus valable) |
 | GET | `/api/auth/me` | oui | US-18 | Mon compte |
+| PATCH | `/api/auth/me` | oui | US-20 | Modifier mon prénom et mon quartier |
+| POST | `/api/auth/password` | oui | US-20 | Changer de mot de passe : `currentPassword`, `newPassword` (ferme les autres sessions) |
+| GET | `/api/auth/me/stats` | oui | US-20 | Mes chiffres : outils, prêts accordés, emprunts, note moyenne |
 | GET | `/api/users` |  | US-09 | Liste publique des voisins (prénom et quartier) |
 | GET | `/api/tools` |  | US-01 | Catalogue, outils disponibles en premier |
 | GET | `/api/tools?q=perceuse` |  | US-11 | Recherche dans le nom et la description, sans tenir compte des majuscules |
 | GET | `/api/tools?category=Perçage` |  | US-10 | Filtre par catégorie (400 si la catégorie est inconnue), combinable avec `q` |
 | GET | `/api/tools/mine` | oui | US-12 | Mes outils, le nombre de demandes en attente et le prêt en cours |
 | GET | `/api/tools/:id/history` | oui | US-14 | Historique des prêts acceptés et rendus, du plus récent au plus ancien (propriétaire seulement) |
-| GET | `/api/tools/:id` |  | US-03 | Fiche d'un outil avec le prénom et le quartier du propriétaire (404 si inconnu) |
+| GET | `/api/tools/:id` |  | US-03, US-20 | Fiche d'un outil : propriétaire, photos et état d'usage (prêts, retours, réservations à venir, sans nom) ; 404 si inconnu |
 | POST | `/api/tools` | oui | US-02 | Proposer un outil : `name` (2 à 60), `category`, `description` (facultative, 300 max) |
 | PATCH | `/api/tools/:id` | oui | US-16 | Modifier mon outil (`name`, `category`, `description`, `status` disponible ou indisponible) |
 | DELETE | `/api/tools/:id` | oui | US-16 | Retirer mon outil (409 s'il est prêté ; les demandes en attente sont annulées) |
 | POST | `/api/tools/:id/photos` | oui | US-17 | Ajouter une photo : `dataUrl` JPEG, PNG, WebP ou GIF, 2 Mo et 4 photos maximum |
 | DELETE | `/api/tools/:id/photos/:photoId` | oui | US-17 | Supprimer une photo |
 | GET | `/api/photos/:photoId` |  | US-17 | Afficher une photo |
-| POST | `/api/loans` | oui | US-04, US-06 | Demander un emprunt : `toolId`, `startDate`, `endDate` (`AAAA-MM-JJ`) |
+| POST | `/api/loans` | oui | US-04, US-06, US-20 | Demander un emprunt : `toolId`, `startDate`, `endDate` (`AAAA-MM-JJ`), `message` facultatif (300 caractères) |
+| POST | `/api/loans/:id/cancel` | oui | US-20 | L'emprunteur annule sa demande tant qu'elle est en attente |
 | POST | `/api/loans/:id/accept` | oui | US-05 | Le propriétaire accepte une demande (l'outil passe « prêté ») |
 | POST | `/api/loans/:id/refuse` | oui | US-05 | Le propriétaire refuse une demande |
 | POST | `/api/loans/:id/return` | oui | US-07 | Le propriétaire déclare le retour (l'outil redevient « disponible ») |
@@ -133,10 +150,11 @@ test/           tests Vitest + Supertest
 | US-13 · Noter l'emprunteur après le retour | #16 |
 | US-14 · Consulter l'historique des prêts d'un outil | #16 |
 | US-15 · Notifications (ajoutée au backlog par l'équipe) | #16 |
-| US-16 · Modifier et supprimer ses outils (ajoutée par l'équipe) | _PR à venir_ |
-| US-17 · Photos des outils (ajoutée par l'équipe) | _PR à venir_ |
-| US-18 · Comptes et connexion (ajoutée par l'équipe) | _PR à venir_ |
-| US-19 · Sauvegarde dans un fichier JSON (ajoutée par l'équipe) | _PR à venir_ |
+| US-16 · Modifier et supprimer ses outils (ajoutée par l'équipe) | #17 |
+| US-17 · Photos des outils (ajoutée par l'équipe) | #17 |
+| US-18 · Comptes et connexion (ajoutée par l'équipe) | #17 |
+| US-19 · Sauvegarde dans un fichier JSON (ajoutée par l'équipe) | #17 |
+| US-20 · Une page par onglet, page complète d'un outil, options (ajoutée par l'équipe) | _PR à venir_ |
 
 État de `main` : `npm run check` → 0 warning de lint, 83 tests verts.
 

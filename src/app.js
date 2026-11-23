@@ -133,10 +133,14 @@ export function createApp(data = seedData(), options = {}) {
     if (!user) {
       return res.status(401).json({ error: 'Utilisateur non identifié' });
     }
-    const { toolId, startDate, endDate } = req.body ?? {};
+    const { toolId, startDate, endDate, message } = req.body ?? {};
     const tool = data.tools.find((t) => t.id === toolId);
     if (!tool) {
       return res.status(404).json({ error: 'Outil introuvable' });
+    }
+    // US-20 : petit mot facultatif pour le propriétaire
+    if (message !== undefined && message !== null && (typeof message !== 'string' || message.trim().length > 300)) {
+      return res.status(400).json({ error: 'Le message ne doit pas dépasser 300 caractères', field: 'message' });
     }
     if (!isValidDate(startDate) || !isValidDate(endDate)) {
       return res.status(400).json({ error: 'Dates invalides (format AAAA-MM-JJ)' });
@@ -164,7 +168,9 @@ export function createApp(data = seedData(), options = {}) {
       startDate,
       endDate,
       status: 'pending',
+      createdAt: new Date().toISOString(),
     };
+    if (typeof message === 'string' && message.trim()) loan.message = message.trim();
     data.loans.push(loan);
     // US-15 : le propriétaire est prévenu qu'on veut emprunter son outil
     notify(
@@ -232,7 +238,7 @@ export function createApp(data = seedData(), options = {}) {
       .filter((n) => n.userId === user.id)
       .map((n) => {
         const loan = data.loans.find((l) => l.id === n.loanId);
-        return { ...n, loanStatus: loan ? loan.status : null };
+        return { ...n, loanStatus: loan ? loan.status : null, loanMessage: loan?.message ?? null };
       })
       .reverse();
     res.status(200).json({ unread: items.filter((n) => !n.read).length, items });
@@ -396,6 +402,27 @@ export function createApp(data = seedData(), options = {}) {
       status: tool.status,
       photos: toolPhotos(tool).map((ph) => ({ id: ph.id, url: photoUrl(ph) })),
       owner: owner ? { firstName: owner.firstName, district: owner.district } : null,
+      createdAt: tool.createdAt ?? null,
+      activity: toolActivity(tool),
+    };
+  };
+  // US-20 : état d'usage public d'un outil (sans le nom des emprunteurs)
+  const toolActivity = (tool) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const loans = data.loans.filter((l) => l.toolId === tool.id);
+    const done = loans.filter((l) => l.status === 'returned');
+    const bookings = loans
+      .filter((l) => l.status === 'accepted' && l.endDate >= today)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .map(({ startDate, endDate }) => ({ startDate, endDate }));
+    const scores = done.filter((l) => l.rating).length;
+    return {
+      timesLent: loans.filter((l) => l.status === 'accepted' || l.status === 'returned').length,
+      timesReturned: done.length,
+      pendingRequests: loans.filter((l) => l.status === 'pending').length,
+      lastReturnedOn: done.map((l) => l.endDate).sort().pop() ?? null,
+      bookings,
+      ratedLoans: scores,
     };
   };
 
@@ -462,7 +489,16 @@ export function createApp(data = seedData(), options = {}) {
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
       .map((t) => {
         const first = toolPhotos(t)[0];
-        return { id: t.id, name: t.name, category: t.category, status: t.status, photo: first ? photoUrl(first) : null };
+        const owner = data.users.find((u) => u.id === t.ownerId);
+        return {
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          status: t.status,
+          photo: first ? photoUrl(first) : null,
+          district: owner?.district ?? null,
+          createdAt: t.createdAt ?? null,
+        };
       });
     res.status(200).json(tools);
   });
@@ -482,6 +518,7 @@ export function createApp(data = seedData(), options = {}) {
       ownerId: user.id,
       ...result.value,
       status: 'available',
+      createdAt: new Date().toISOString(),
     };
     data.tools.push(tool);
     res.status(201).location(`/api/tools/${tool.id}`).json(tool);
@@ -501,6 +538,7 @@ export function createApp(data = seedData(), options = {}) {
       startDate: l.startDate,
       endDate: l.endDate,
       status: l.status,
+      message: l.message ?? null,
       rating: l.rating ?? null,
       borrower: borrower
         ? { id: borrower.id, firstName: borrower.firstName, district: borrower.district, rating: borrowerRating(borrower.id) }
@@ -596,10 +634,18 @@ export function createApp(data = seedData(), options = {}) {
     const loans = data.loans
       .filter((l) => l.borrowerId === user.id)
       .sort((a, b) => a.startDate.localeCompare(b.startDate))
-      .map((l) => ({
-        ...l,
-        toolName: data.tools.find((t) => t.id === l.toolId)?.name ?? l.toolName ?? null,
-      }));
+      .map((l) => {
+        const tool = data.tools.find((t) => t.id === l.toolId);
+        const owner = tool && data.users.find((u) => u.id === tool.ownerId);
+        const photo = tool && toolPhotos(tool)[0];
+        return {
+          ...l,
+          toolName: tool?.name ?? l.toolName ?? null,
+          toolExists: Boolean(tool),
+          toolPhoto: photo ? photoUrl(photo) : null,
+          owner: owner ? { firstName: owner.firstName, district: owner.district } : null,
+        };
+      });
     res.status(200).json(loans);
   });
 
@@ -610,6 +656,87 @@ export function createApp(data = seedData(), options = {}) {
       return res.status(404).json({ error: 'Outil introuvable' });
     }
     res.status(200).json(toolView(tool));
+  });
+
+  // US-20 : l'emprunteur annule sa demande tant qu'elle est en attente
+  app.post('/api/loans/:id/cancel', (req, res) => {
+    const user = currentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const loan = data.loans.find((l) => l.id === req.params.id);
+    if (!loan) {
+      return res.status(404).json({ error: 'Demande introuvable' });
+    }
+    if (loan.borrowerId !== user.id) {
+      return res.status(403).json({ error: 'Seul le demandeur peut annuler sa demande' });
+    }
+    if (loan.status !== 'pending') {
+      return res.status(409).json({ error: "Seule une demande en attente peut être annulée" });
+    }
+    loan.status = 'cancelled';
+    const tool = data.tools.find((t) => t.id === loan.toolId);
+    if (tool) {
+      notify(tool.ownerId, 'loan_cancelled', loan, `${user.firstName} a annulé sa demande pour « ${tool.name} » du ${loan.startDate} au ${loan.endDate}.`);
+    }
+    res.status(200).json(loan);
+  });
+
+  // US-20 : modifier mon profil (prénom, quartier)
+  app.patch('/api/auth/me', (req, res) => {
+    const user = currentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const { firstName, district } = req.body ?? {};
+    const changes = {};
+    for (const [field, value, label] of [['firstName', firstName, 'Le prénom'], ['district', district, 'Le quartier']]) {
+      if (value === undefined) continue;
+      const clean = typeof value === 'string' ? value.trim() : '';
+      if (clean.length < 2 || clean.length > 40) {
+        return res.status(400).json({ error: `${label} doit contenir entre 2 et 40 caractères`, field });
+      }
+      changes[field] = clean;
+    }
+    Object.assign(user, changes);
+    res.status(200).json(publicUser(user));
+  });
+
+  // US-20 : changer de mot de passe (les autres sessions sont fermées)
+  app.post('/api/auth/password', (req, res) => {
+    const user = currentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const { currentPassword, newPassword } = req.body ?? {};
+    if (!verifyPassword(currentPassword, user.passwordHash)) {
+      return res.status(400).json({ error: 'Le mot de passe actuel est incorrect', field: 'currentPassword' });
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+      return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir entre 8 et 128 caractères', field: 'newPassword' });
+    }
+    user.passwordHash = hashPassword(newPassword);
+    const current = sessionFor(req);
+    data.sessions = data.sessions.filter((s) => s.userId !== user.id || s === current);
+    res.status(200).json({ ok: true });
+  });
+
+  // US-20 : mes chiffres (outils, prêts donnés et reçus, note moyenne)
+  app.get('/api/auth/me/stats', (req, res) => {
+    const user = currentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Utilisateur non identifié' });
+    }
+    const myToolIds = new Set(data.tools.filter((t) => t.ownerId === user.id).map((t) => t.id));
+    const lentOrDone = (l) => l.status === 'accepted' || l.status === 'returned';
+    res.status(200).json({
+      tools: myToolIds.size,
+      loansGiven: data.loans.filter((l) => myToolIds.has(l.toolId) && lentOrDone(l)).length,
+      loansReceived: data.loans.filter((l) => l.borrowerId === user.id && lentOrDone(l)).length,
+      pendingReceived: data.loans.filter((l) => myToolIds.has(l.toolId) && l.status === 'pending').length,
+      pendingSent: data.loans.filter((l) => l.borrowerId === user.id && l.status === 'pending').length,
+      rating: borrowerRating(user.id),
+    });
   });
 
   // US-07 : déclarer le retour d'un outil

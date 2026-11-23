@@ -8,6 +8,7 @@ export const STATUS_LABELS = {
   accepted: 'Acceptée',
   refused: 'Refusée',
   returned: 'Rendu',
+  cancelled: 'Annulée',
 };
 
 const ERROR_TITLES = {
