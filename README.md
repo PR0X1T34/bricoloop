@@ -1,6 +1,9 @@
-# BricoLoop
+# BricoLoop · équipe Jus de Bissap
 
 > Un voisin peut emprunter un outil disponible près de chez lui en quelques clics, et le propriétaire garde la main sur ses prêts.
+
+Projet fil rouge de l'atelier Scrum EPSI B3. **Les 14 stories de l'énoncé sont livrées**, plus 6 stories ajoutées par l'équipe (US-15 à US-20). `npm run check` : 0 warning de lint, 165 tests verts.
+Le déroulé de la journée, sprint par sprint, est dans le [carnet de bord](CARNET_DE_BORD.md).
 
 ## Équipe
 
@@ -16,9 +19,9 @@
 |           | PO | SM |
 |-----------|----|----|
 | Lancement | Rafael | – |
-| Sprint 1  | Rafael | _à compléter_ |
-| Sprint 2  | Emerick | _à compléter_ |
-| Sprint 3  | Mathis | _à compléter_ |
+| Sprint 1  | Rafael | Aucun désigné |
+| Sprint 2  | Emerick | Aucun désigné |
+| Sprint 3  | Mathis | Dogan _(à confirmer)_ |
 
 Dogan a rejoint l'équipe au Sprint 3 : il ne restait qu'un sprint, il n'a donc pas pu être PO.
 
@@ -116,11 +119,13 @@ curl -X POST http://localhost:3000/api/tools \
 ## Structure
 
 ```
-src/app.js      createApp() : l'application Express (sans ouvrir de port)
-src/server.js   démarrage (listen)
-src/seed.js     données de démo et catégories
-public/         interface web (HTML/JS) servie par Express
-test/           tests Vitest + Supertest
+src/app.js      createApp() : l'application Express et ses routes (sans ouvrir de port)
+src/server.js   démarrage : sauvegarde JSON, comptes obligatoires, listen
+src/auth.js     hachage des mots de passe (scrypt) et jetons de session
+src/store.js    lecture et écriture de data/bricoloop.json
+src/seed.js     données de démo, comptes de démo et catégories
+public/         interface web (index.html, style.css, main.js, ui.js) servie par Express
+test/           tests Vitest + Supertest (un fichier par story ou par thème)
 ```
 
 ## Règles de travail (Definition of Done)
@@ -154,10 +159,12 @@ test/           tests Vitest + Supertest
 | US-17 · Photos des outils (ajoutée par l'équipe) | #17 |
 | US-18 · Comptes et connexion (ajoutée par l'équipe) | #17 |
 | US-19 · Sauvegarde dans un fichier JSON (ajoutée par l'équipe) | #17 |
-| US-20 · Une page par onglet, page complète d'un outil, options (ajoutée par l'équipe) | _PR à venir_ |
+| US-20 · Une page par onglet, page complète d'un outil, options (ajoutée par l'équipe) | #18 |
 
-État de `main` : `npm run check` → 0 warning de lint, 83 tests verts.
+État de `main` : `npm run check` → 0 warning de lint, 165 tests verts. Valeur PO livrée : 365 sur 365.
+
+Écarts assumés (détaillés dans le carnet) : pas de Scrum Master aux sprints 1 et 2 ; les PR #1 et #10 faites depuis l'interface GitHub ; les PR #16 et #17 regroupent plusieurs stories. Une partie du code a été écrite avec l'aide d'un assistant IA (commits signés « Claude »), relue et approuvée par l'équipe avant chaque merge.
 
 ## Vidéo
 
-_lien à ajouter_
+_lien à ajouter_ (démonstration de 3 à 5 minutes sur `main`)
